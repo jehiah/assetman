@@ -26,7 +26,7 @@ class S3UploadThread(threading.Thread):
 
     def __init__(self, queue, errors, manifest, settings):
         threading.Thread.__init__(self)
-        self.client = boto3.resource('s3',
+        self.client = boto3.client('s3',
             aws_access_key_id=settings.get('aws_access_key'),
             aws_secret_access_key=settings.get('aws_secret_key'))
         self.bucket = boto3.resource('s3',
@@ -87,7 +87,7 @@ class S3UploadThread(threading.Thread):
     def exists(self, obj):
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.head_object
         try:
-            self.client.head_object(Bucket=obj.bucket, Key=obj.key)
+            self.client.head_object(Bucket=obj.bucket_name, Key=obj.key)
         except Exception, e:
             logging.error('got %s', e)
             return False
@@ -104,12 +104,12 @@ class S3UploadThread(threading.Thread):
         """
         if self.settings.get('force_s3_upload') or not self.exists(key):
             # Do we need to do URL replacement?
-            if re.search(r'\.(css|js)$', key.name):
+            if re.search(r'\.(css|js)$', key.key):
                 if for_cdn:
-                    logging.info('Rewriting URLs => CDN in %s', key.name)
+                    logging.info('Rewriting URLs => CDN in %s', key.key)
                     replacement_prefix = self.settings.get('cdn_url_prefix')
                 else:
-                    logging.info('Rewriting URLs => local proxy in %s', key.name)
+                    logging.info('Rewriting URLs => local proxy in %s', key.key)
                     replacement_prefix = self.settings.get('local_cdn_url_prefix')
                 file_data = sub_static_version(
                     file_data,
@@ -121,7 +121,7 @@ class S3UploadThread(threading.Thread):
             logging.info('Uploaded s3://%s/%s', key.bucket_name, key.key)
             logging.debug('Headers: %r', headers)
         else:
-            logging.info('Skipping upload of %s; already exists (use force_s3_upload to override)', key.name)
+            logging.info('Skipping upload of %s; already exists (use force_s3_upload to override)', key.key)
 
     def get_expires(self):
         # Get a properly formatted date and time, via Tornado's set_header()
