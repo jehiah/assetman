@@ -26,7 +26,7 @@ class S3UploadThread(threading.Thread):
 
     def __init__(self, queue, errors, manifest, settings):
         threading.Thread.__init__(self)
-        self.bucket = boto3.client('s3',
+        self.bucket = boto3.resource('s3',
             aws_access_key_id=settings.get('aws_access_key'),
             aws_secret_access_key=settings.get('aws_secret_key')).Bucket(settings.get('s3_assets_bucket'))
         self.queue = queue
