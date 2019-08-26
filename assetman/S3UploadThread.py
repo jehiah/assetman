@@ -26,6 +26,9 @@ class S3UploadThread(threading.Thread):
 
     def __init__(self, queue, errors, manifest, settings):
         threading.Thread.__init__(self)
+        self.client = boto3.resource('s3',
+            aws_access_key_id=settings.get('aws_access_key'),
+            aws_secret_access_key=settings.get('aws_secret_key'))
         self.bucket = boto3.resource('s3',
             aws_access_key_id=settings.get('aws_access_key'),
             aws_secret_access_key=settings.get('aws_secret_key')).Bucket(settings.get('s3_assets_bucket'))
@@ -81,6 +84,15 @@ class S3UploadThread(threading.Thread):
             key = self.bucket.Object(key_prefix + '/' + file_name)
             self.upload_file(key, file_data, headers, for_cdn=False)
 
+    def exists(self, obj):
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.head_object
+        try:
+            self.client.head_object(Bucket=obj.bucket, Key=obj.key)
+        except Exception, e:
+            logging.error('got %s', e)
+            return False
+        return True
+
     def upload_file(self, key, file_data, headers, for_cdn):
         """Uploads the given file_data to the given S3 key. If the file is a
         compiled asset (ie, JS or CSS file), any static URL references it
@@ -90,7 +102,7 @@ class S3UploadThread(threading.Thread):
         our CloudFront CDN domains. Otherwise, they will be updated to point
         to our local CDN proxy.
         """
-        if not key.head_object() or self.settings.get('force_s3_upload'):
+        if self.settings.get('force_s3_upload') or not self.exists(key):
             # Do we need to do URL replacement?
             if re.search(r'\.(css|js)$', key.name):
                 if for_cdn:
